@@ -69,7 +69,16 @@ export default async function usePostgresAuthState(
 
 			if (res.rowCount === 0) return null;
 
-			const parsed = JSON.parse(res.rows[0].value, BufferJSON.reviver);
+			// PostgreSQL JSONB returns objects directly, not JSON strings
+			// If it's already an object, just apply reviver; otherwise parse it
+			let parsed;
+			const rawValue = res.rows[0].value;
+			if (typeof rawValue === 'string') {
+				parsed = JSON.parse(rawValue, BufferJSON.reviver);
+			} else {
+				// For JSONB, value is already an object, apply reviver via JSON round-trip
+				parsed = JSON.parse(JSON.stringify(rawValue), BufferJSON.reviver);
+			}
 			cache.set(cacheKey, parsed);
 			return parsed;
 		} catch (err) {
