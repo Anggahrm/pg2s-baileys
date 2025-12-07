@@ -76,8 +76,19 @@ export default async function usePostgresAuthState(
 			if (typeof rawValue === 'string') {
 				parsed = JSON.parse(rawValue, BufferJSON.reviver);
 			} else {
-				// For JSONB, value is already an object, apply reviver via JSON round-trip
-				parsed = JSON.parse(JSON.stringify(rawValue), BufferJSON.reviver);
+				// For JSONB, value is already an object, apply reviver recursively
+				const applyReviver = (obj) => {
+					if (obj === null || typeof obj !== 'object') return obj;
+					// Apply reviver to each key-value pair
+					for (const key in obj) {
+						if (obj.hasOwnProperty(key)) {
+							obj[key] = applyReviver(obj[key]);
+						}
+					}
+					// Apply reviver to the object itself (for Buffer conversion)
+					return BufferJSON.reviver('', obj);
+				};
+				parsed = applyReviver(rawValue);
 			}
 			cache.set(cacheKey, parsed);
 			return parsed;
