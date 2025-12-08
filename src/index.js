@@ -95,9 +95,6 @@ export default async function usePostgresAuthState(
         await dbSet("creds", creds);
     }
 
-	// Create state object with credentials and key management
-	// Note: Baileys mutates the creds object properties (not the reference)
-	// so state.creds always points to the current credentials
 	const state = {
 		creds,
 		keys: {
