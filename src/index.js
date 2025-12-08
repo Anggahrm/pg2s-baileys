@@ -9,31 +9,21 @@ export default async function usePostgresAuthState(
 	phoneNumber,
 	{ proto, initAuthCreds, BufferJSON }
 ) {
-	if (!connOptions || typeof connOptions !== "object")
-		throw new Error("Invalid connection options.");
-	if (!phoneNumber || typeof phoneNumber !== "string")
-		throw new Error("phoneNumber must be a string.");
-	if (!proto || !initAuthCreds || !BufferJSON)
-		throw new Error("Missing required dependencies.");
-	if (typeof initAuthCreds !== "function")
-		throw new Error("initAuthCreds must be a function.");
-	if (
-		typeof BufferJSON.replacer !== "function" ||
-		typeof BufferJSON.reviver !== "function"
-	)
-		throw new Error("Invalid BufferJSON.");
+	if (!connOptions || typeof connOptions !== "object") throw new Error("Invalid connection options.");
+	if (!phoneNumber || typeof phoneNumber !== "string") throw new Error("phoneNumber must be a string.");
+	if (!proto || !initAuthCreds || !BufferJSON) throw new Error("Missing required dependencies.");
 
 	const pool = new Pool(connOptions);
 
 	await pool.query(`
-    CREATE TABLE IF NOT EXISTS auth_state (
-      id SERIAL PRIMARY KEY,
-      phone_number BIGINT NOT NULL,
-      key TEXT NOT NULL,
-      value JSONB,
-      UNIQUE (phone_number, key)
-    )
-  `);
+        CREATE TABLE IF NOT EXISTS auth_state (
+            id SERIAL PRIMARY KEY,
+            phone_number BIGINT NOT NULL,
+            key TEXT NOT NULL,
+            value JSONB, 
+            UNIQUE (phone_number, key)
+        )
+    `);
 
 	const dbSet = async (key, value) => {
 		const phoneNum = BigInt(phoneNumber);
@@ -42,12 +32,11 @@ export default async function usePostgresAuthState(
 		try {
 			await pool.query(
 				`INSERT INTO auth_state (phone_number, key, value)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (phone_number, key)
-         DO UPDATE SET value = EXCLUDED.value`,
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (phone_number, key)
+                 DO UPDATE SET value = EXCLUDED.value`,
 				[phoneNum, key, json]
 			);
-
 			cache.set(`${phoneNumber}:${key}`, value);
 		} catch (err) {
 			console.error(`Error setting auth for ${phoneNumber}:${key}:`, err);
@@ -63,7 +52,7 @@ export default async function usePostgresAuthState(
 		const phoneNum = BigInt(phoneNumber);
 		try {
 			const res = await pool.query(
-				`SELECT value FROM auth_state WHERE phone_number = $1 AND key = $2 LIMIT 1`,
+				`SELECT value::TEXT FROM auth_state WHERE phone_number = $1 AND key = $2 LIMIT 1`,
 				[phoneNum, key]
 			);
 
@@ -87,24 +76,15 @@ export default async function usePostgresAuthState(
 			);
 			cache.del(`${phoneNumber}:${key}`);
 		} catch (err) {
-			console.error(
-				`Error deleting auth for ${phoneNumber}:${key}:`,
-				err
-			);
+			console.error(`Error deleting auth for ${phoneNumber}:${key}:`, err);
 		}
 	};
 
 	const dbClearByPhone = async () => {
 		const phoneNum = BigInt(phoneNumber);
 		try {
-			await pool.query(`DELETE FROM auth_state WHERE phone_number = $1`, [
-				phoneNum
-			]);
-			cache
-				.keys()
-				.forEach(
-					(k) => k.startsWith(`${phoneNumber}:`) && cache.del(k)
-				);
+			await pool.query(`DELETE FROM auth_state WHERE phone_number = $1`, [phoneNum]);
+			cache.keys().forEach((k) => k.startsWith(`${phoneNumber}:`) && cache.del(k));
 		} catch (err) {
 			console.error(`Error clearing auth for ${phoneNumber}:`, err);
 		}
@@ -112,8 +92,8 @@ export default async function usePostgresAuthState(
 
 	const creds = (await dbGet("creds")) ?? initAuthCreds();
 	if (!cache.has(`${phoneNumber}:creds`)) {
-    await dbSet("creds", creds);
-}
+        await dbSet("creds", creds);
+    }
 
 	return {
 		state: {
@@ -126,10 +106,7 @@ export default async function usePostgresAuthState(
 							const keyName = `${type}-${id}`;
 							let value = await dbGet(keyName);
 							if (type === "app-state-sync-key" && value) {
-								value =
-									proto.Message.AppStateSyncKeyData.fromObject(
-										value
-									);
+								value = proto.Message.AppStateSyncKeyData.fromObject(value);
 							}
 							out[id] = value || null;
 						})
