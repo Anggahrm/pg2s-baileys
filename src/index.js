@@ -95,39 +95,41 @@ export default async function usePostgresAuthState(
         await dbSet("creds", creds);
     }
 
-	return {
-		state: {
-			creds,
-			keys: {
-				get: async (type, ids) => {
-					const out = {};
-					await Promise.all(
-						ids.map(async (id) => {
-							const keyName = `${type}-${id}`;
-							let value = await dbGet(keyName);
-							if (type === "app-state-sync-key" && value) {
-								value = proto.Message.AppStateSyncKeyData.fromObject(value);
-							}
-							out[id] = value || null;
-						})
-					);
-					return out;
-				},
-				set: async (data) => {
-					const ops = [];
-					for (const category in data) {
-						for (const id in data[category]) {
-							const value = data[category][id];
-							const keyName = `${category}-${id}`;
-							if (value) ops.push(dbSet(keyName, value));
-							else ops.push(dbDelete(keyName));
+	const state = {
+		creds,
+		keys: {
+			get: async (type, ids) => {
+				const out = {};
+				await Promise.all(
+					ids.map(async (id) => {
+						const keyName = `${type}-${id}`;
+						let value = await dbGet(keyName);
+						if (type === "app-state-sync-key" && value) {
+							value = proto.Message.AppStateSyncKeyData.fromObject(value);
 						}
+						out[id] = value || null;
+					})
+				);
+				return out;
+			},
+			set: async (data) => {
+				const ops = [];
+				for (const category in data) {
+					for (const id in data[category]) {
+						const value = data[category][id];
+						const keyName = `${category}-${id}`;
+						if (value) ops.push(dbSet(keyName, value));
+						else ops.push(dbDelete(keyName));
 					}
-					await Promise.all(ops);
 				}
+				await Promise.all(ops);
 			}
-		},
-		saveCreds: async () => await dbSet("creds", creds),
+		}
+	};
+
+	return {
+		state,
+		saveCreds: async () => await dbSet("creds", state.creds),
 		resetSession: async () => await dbClearByPhone()
 	};
 }
